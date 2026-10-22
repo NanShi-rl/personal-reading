@@ -1,3 +1,6 @@
+import matter from 'gray-matter';
+import { ReadingNote } from '@/types/note';
+
 export interface GitHubCommitResult {
   success: boolean;
   message?: string;
@@ -100,14 +103,12 @@ export async function commitFileToGitHub(
 
   let sha = existingSha;
   if (!sha) {
-    // Attempt to see if file exists to get SHA
     const existing = await fetchFileFromGitHub(filePath, token);
     if (existing) {
       sha = existing.sha;
     }
   }
 
-  // Base64 encode UTF-8 string
   const base64Content = btoa(
     encodeURIComponent(content).replace(/%([0-9A-F]{2})/g, (_, p1) =>
       String.fromCharCode(parseInt(p1, 16))
@@ -160,8 +161,8 @@ export async function commitFileToGitHub(
 
 export async function deleteFileFromGitHub(
   filePath: string,
-  sha: string,
-  commitMessage: string
+  sha?: string,
+  commitMessage: string = 'docs(notes): delete note'
 ): Promise<GitHubCommitResult> {
   const token = getStoredGitHubToken();
   if (!token) {
@@ -172,6 +173,20 @@ export async function deleteFileFromGitHub(
   }
 
   const { owner, repo, branch } = getRepoConfig();
+
+  let targetSha = sha;
+  if (!targetSha) {
+    const existing = await fetchFileFromGitHub(filePath, token);
+    if (existing) {
+      targetSha = existing.sha;
+    } else {
+      return {
+        success: false,
+        error: `Could not find file ${filePath} in repository.`,
+      };
+    }
+  }
+
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`;
 
   try {
@@ -184,7 +199,7 @@ export async function deleteFileFromGitHub(
       },
       body: JSON.stringify({
         message: commitMessage,
-        sha,
+        sha: targetSha,
         branch,
       }),
     });
@@ -207,4 +222,68 @@ export async function deleteFileFromGitHub(
       error: err.message || 'Error occurred while deleting file.',
     };
   }
+}
+
+/**
+ * Deletes a note and automatically updates any other note in the repo
+ * that links to this note to remove the dangling linkage.
+ */
+export async function deleteNoteWithCascadeCleanup(
+  noteId: string,
+  noteSlug: string,
+  allNotes: ReadingNote[]
+): Promise<GitHubCommitResult> {
+  const token = getStoredGitHubToken();
+  if (!token) {
+    return {
+      success: false,
+      error: 'GitHub Personal Access Token is required to delete notes.',
+    };
+  }
+
+  // 1. Delete the primary note file
+  const filePath = `content/notes/${noteSlug || noteId}.md`;
+  const deleteResult = await deleteFileFromGitHub(
+    filePath,
+    undefined,
+    `docs(notes): delete note "${noteId}"`
+  );
+
+  if (!deleteResult.success) {
+    return deleteResult;
+  }
+
+  // 2. Cascade cleanup: Find all other notes that reference this note
+  const notesWithLinkage = allNotes.filter(
+    (n) => n.id !== noteId && n.links?.some((l) => l.id === noteId)
+  );
+
+  for (const linkingNote of notesWithLinkage) {
+    const otherFilePath = `content/notes/${linkingNote.slug || linkingNote.id}.md`;
+    const fetched = await fetchFileFromGitHub(otherFilePath, token);
+    if (fetched) {
+      const { data, content } = matter(fetched.content);
+      const updatedLinks = (data.links || []).filter((l: any) => l.id !== noteId);
+      const updatedFrontmatter = {
+        ...data,
+        links: updatedLinks,
+        last_modified: new Date().toISOString().split('T')[0],
+      };
+      if (updatedLinks.length === 0) {
+        delete updatedFrontmatter.links;
+      }
+      const updatedMarkdown = matter.stringify(content, updatedFrontmatter);
+      await commitFileToGitHub(
+        otherFilePath,
+        updatedMarkdown,
+        `docs(notes): remove deleted linkage to "${noteId}" from "${linkingNote.id}"`,
+        fetched.sha
+      );
+    }
+  }
+
+  return {
+    success: true,
+    message: `Note "${noteId}" and all linkages to it were successfully removed.`,
+  };
 }

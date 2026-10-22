@@ -1,5 +1,5 @@
 ---
-id: attention-is-all-you-need
+id: collatz-conjecture-lean-proof-wrong
 title: Collatz Conjecture Lean Proof Turns Out to be Wrong
 topic: Mathematics
 type: article
@@ -15,9 +15,9 @@ tags:
   - AI
   - Lean
 links:
-  - id: thinking-fast-and-slow
+  - id: intro-to-mathematical-formalization-lean
     relationship: related_to
-    notes: an example of potential issue behind the Lean framework
+    notes: An example of potential issue behind the Lean framework
 date_started: '2026-10-22'
 date_finished: '2026-10-22'
 last_modified: '2026-10-22'
