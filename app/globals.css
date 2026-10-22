@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased font-sans;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Typography styles for rendered markdown */
+.prose {
+  color: #334155;
+}
+.dark .prose {
+  color: #cbd5e1;
+}
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-weight: 700;
+  color: #0f172a;
+}
+.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4 {
+  color: #f8fafc;
+}
+.prose h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.35rem;
+}
+.dark .prose h2 {
+  border-bottom-color: #1e293b;
+}
+.prose h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+.prose p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.prose ul, .prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1.25rem;
+}
+.prose ul {
+  list-style-type: disc;
+}
+.prose ol {
+  list-style-type: decimal;
+}
+.prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+.prose blockquote {
+  border-left: 3px solid #0284c7;
+  padding-left: 1rem;
+  font-style: italic;
+  margin: 1rem 0;
+  color: #475569;
+}
+.dark .prose blockquote {
+  color: #94a3b8;
+}
+.prose code {
+  background: #f1f5f9;
+  color: #0369a1;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: monospace;
+}
+.dark .prose code {
+  background: #1e293b;
+  color: #38bdf8;
+}
+.prose pre {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.prose pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
