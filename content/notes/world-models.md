@@ -3,18 +3,22 @@ id: world-models
 title: World Models
 topic: Artificial Intelligence
 type: article
-source:
-  title: World model (artificial intelligence)
-  author: (Wikipedia)
-  url: 'https://en.wikipedia.org/wiki/World_model_(artificial_intelligence)'
-  published_year: 2026
+sources:
+  - title: World model (artificial intelligence)
+    author: (Wikipedia)
+    url: 'https://en.wikipedia.org/wiki/World_model_(artificial_intelligence)'
+    published_year: 2026
+  - title: A Beginner’s Guide to World Models
+    author: Mauro Di Pietro
+    url: 'https://towardsdatascience.com/a-beginners-guide-to-world-models/'
+    published_year: 2026
 status: reading
 rating: 4
 tags:
   - AI
 date_started: '2026-10-22'
 date_finished: '2026-10-22'
-last_modified: '2026-10-22'
+last_modified: '2026-10-23'
 summary: >-
   World models establish a physics-first paradigm shift that allows machines to
   comprehend space, time, and causality. They enable autonomous agents to
@@ -53,3 +57,7 @@ key_takeaways:
   - Autonomous vehicles: Long-tail scenario simulation (Waymo, Wayve, Uber)
   - Healthcare & drug discovery: Integrating genomic, proteomic, chemical data
   - Spatial computing / gaming: Generated 3D worlds (Marble, Genie)
+- World Model example:
+  - The input data is Atari RGB pictures (210x160x3) with raw pixel values (0-255). The first step is cleaning and reshaping the data into a small grayscale tensor (1x64x64) with normalized values (0-1)
+  - We have a dataset of how the environment behaves: “I saw this image → I took this action → then I saw this next image”.
+  - We want to train a World Model that can predict what the environment will look like after an action.
