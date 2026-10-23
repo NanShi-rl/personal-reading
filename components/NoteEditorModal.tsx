@@ -5,7 +5,7 @@ import { X, Save, Eye, Edit3, Trash2, Plus, ExternalLink, Sparkles, AlertCircle 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import matter from 'gray-matter';
-import { ReadingNote, ReadingType, ReadingStatus, LinkRelationship, NoteLinkage } from '@/types/note';
+import { ReadingNote, ReadingType, ReadingStatus, LinkRelationship, NoteLinkage, SourceMetadata } from '@/types/note';
 import { commitFileToGitHub, deleteFileFromGitHub, getStoredGitHubToken } from '@/lib/github';
 
 interface NoteEditorModalProps {
@@ -37,10 +37,9 @@ export default function NoteEditorModal({
   const [type, setType] = useState<ReadingType>('book');
   const [status, setStatus] = useState<ReadingStatus>('completed');
   const [rating, setRating] = useState<number>(5);
-  const [sourceTitle, setSourceTitle] = useState('');
-  const [sourceAuthor, setSourceAuthor] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
-  const [publishedYear, setPublishedYear] = useState<string>('');
+  const [sources, setSources] = useState<SourceMetadata[]>([
+    { title: '', author: '', url: '', published_year: undefined },
+  ]);
   const [tagsInput, setTagsInput] = useState('');
   const [summary, setSummary] = useState('');
   const [keyTakeawaysInput, setKeyTakeawaysInput] = useState('');
@@ -58,10 +57,16 @@ export default function NoteEditorModal({
       setType(note.type);
       setStatus(note.status);
       setRating(note.rating || 5);
-      setSourceTitle(note.source?.title || '');
-      setSourceAuthor(note.source?.author || '');
-      setSourceUrl(note.source?.url || '');
-      setPublishedYear(note.source?.published_year ? String(note.source.published_year) : '');
+
+      // Handle sources
+      if (note.sources && note.sources.length > 0) {
+        setSources(note.sources.map((s) => ({ ...s })));
+      } else if (note.source && (note.source.title || note.source.author)) {
+        setSources([{ ...note.source }]);
+      } else {
+        setSources([{ title: '', author: '', url: '', published_year: undefined }]);
+      }
+
       setTagsInput(note.tags?.join(', ') || '');
       setSummary(note.summary || '');
       setKeyTakeawaysInput(note.key_takeaways?.join('\n') || '');
@@ -76,10 +81,7 @@ export default function NoteEditorModal({
       setType('book');
       setStatus('reading');
       setRating(5);
-      setSourceTitle('');
-      setSourceAuthor('');
-      setSourceUrl('');
-      setPublishedYear('');
+      setSources([{ title: '', author: '', url: '', published_year: undefined }]);
       setTagsInput('');
       setSummary('');
       setKeyTakeawaysInput('');
@@ -101,6 +103,25 @@ export default function NoteEditorModal({
         .replace(/[^\w\s-]/g, '')
         .replace(/\s+/g, '-');
       setId(generated);
+    }
+  };
+
+  // Source list handlers
+  const handleAddSource = () => {
+    setSources([...sources, { title: '', author: '', url: '', published_year: undefined }]);
+  };
+
+  const handleUpdateSource = (index: number, field: keyof SourceMetadata, value: any) => {
+    const updated = [...sources];
+    updated[index] = { ...updated[index], [field]: value };
+    setSources(updated);
+  };
+
+  const handleRemoveSource = (index: number) => {
+    if (sources.length === 1) {
+      setSources([{ title: '', author: '', url: '', published_year: undefined }]);
+    } else {
+      setSources(sources.filter((_, i) => i !== index));
     }
   };
 
@@ -132,17 +153,22 @@ export default function NoteEditorModal({
       .map((t) => t.trim())
       .filter(Boolean);
 
+    // Clean sources
+    const cleanedSources = sources
+      .map((s) => ({
+        title: s.title?.trim() || title.trim(),
+        author: s.author?.trim() || '',
+        ...(s.url?.trim() ? { url: s.url.trim() } : {}),
+        ...(s.published_year ? { published_year: Number(s.published_year) } : {}),
+      }))
+      .filter((s) => s.author || s.title || s.url);
+
     const frontmatterObj: Record<string, any> = {
       id: id.trim(),
       title: title.trim(),
       topic: topic.trim(),
       type,
-      source: {
-        title: sourceTitle.trim() || title.trim(),
-        author: sourceAuthor.trim(),
-        ...(sourceUrl.trim() ? { url: sourceUrl.trim() } : {}),
-        ...(publishedYear ? { published_year: parseInt(publishedYear, 10) } : {}),
-      },
+      sources: cleanedSources.length > 0 ? cleanedSources : [{ title: title.trim(), author: '' }],
       status,
       rating: Number(rating),
       tags,
@@ -359,55 +385,100 @@ export default function NoteEditorModal({
                 </div>
               </div>
 
-              {/* Source Info */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
-                  Source Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Source Info (Multiple Sources Support) */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Author(s)</label>
-                    <input
-                      type="text"
-                      value={sourceAuthor}
-                      onChange={(e) => setSourceAuthor(e.target.value)}
-                      placeholder="e.g. Robert C. Martin"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none"
-                    />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Reading Sources ({sources.length})
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Add one or more sources (books, papers, blog posts, original links)
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleAddSource}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-xs font-medium text-slate-800 dark:text-slate-200 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Source</span>
+                  </button>
+                </div>
 
-                  <div>
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Original Title</label>
-                    <input
-                      type="text"
-                      value={sourceTitle}
-                      onChange={(e) => setSourceTitle(e.target.value)}
-                      placeholder="Defaults to note title"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none"
-                    />
-                  </div>
+                <div className="space-y-3">
+                  {sources.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 relative space-y-2"
+                    >
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-700 text-xs font-semibold text-slate-500">
+                        <span>Source #{idx + 1}</span>
+                        {sources.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSource(idx)}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded"
+                            title="Remove source"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
 
-                  <div>
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Source URL</label>
-                    <input
-                      type="url"
-                      value={sourceUrl}
-                      onChange={(e) => setSourceUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none"
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Author(s)</label>
+                          <input
+                            type="text"
+                            value={src.author}
+                            onChange={(e) => handleUpdateSource(idx, 'author', e.target.value)}
+                            placeholder="e.g. Robert C. Martin"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
 
-                  <div>
-                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Year</label>
-                    <input
-                      type="number"
-                      value={publishedYear}
-                      onChange={(e) => setPublishedYear(e.target.value)}
-                      placeholder="2024"
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none"
-                    />
-                  </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Original Title</label>
+                          <input
+                            type="text"
+                            value={src.title}
+                            onChange={(e) => handleUpdateSource(idx, 'title', e.target.value)}
+                            placeholder="Defaults to note title"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Source URL</label>
+                          <input
+                            type="url"
+                            value={src.url || ''}
+                            onChange={(e) => handleUpdateSource(idx, 'url', e.target.value)}
+                            placeholder="https://..."
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Year</label>
+                          <input
+                            type="number"
+                            value={src.published_year !== undefined ? String(src.published_year) : ''}
+                            onChange={(e) =>
+                              handleUpdateSource(
+                                idx,
+                                'published_year',
+                                e.target.value ? parseInt(e.target.value, 10) : undefined
+                              )
+                            }
+                            placeholder="2024"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -580,11 +651,16 @@ export default function NoteEditorModal({
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
                   {title || 'Untitled Note'}
                 </h1>
-                {sourceAuthor && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    By <span className="font-medium text-slate-700 dark:text-slate-300">{sourceAuthor}</span>
-                    {publishedYear ? ` (${publishedYear})` : ''}
-                  </p>
+                {sources.filter((s) => s.author || s.title).length > 0 && (
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                    {sources.map((s, idx) => (
+                      <div key={idx}>
+                        By <span className="font-medium text-slate-700 dark:text-slate-300">{s.author || 'Unknown'}</span>
+                        {s.title && s.title !== title ? ` — "${s.title}"` : ''}
+                        {s.published_year ? ` (${s.published_year})` : ''}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 

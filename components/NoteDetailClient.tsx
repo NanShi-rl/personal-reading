@@ -195,27 +195,46 @@ export default function NoteDetailClient({ note, allNotes }: NoteDetailClientPro
               {note.title}
             </h1>
 
-            {/* Author / Source link */}
-            <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">
-              {note.source?.author && (
-                <span>
-                  By <strong className="text-slate-700 dark:text-slate-200">{note.source.author}</strong>
-                  {note.source.published_year ? ` (${note.source.published_year})` : ''}
+            {/* Sources list */}
+            {note.sources && note.sources.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Sources ({note.sources.length}):
                 </span>
-              )}
-
-              {note.source?.url && (
-                <a
-                  href={note.source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline"
-                >
-                  <span>Original Source</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              )}
-            </div>
+                <div className="flex flex-col gap-1.5">
+                  {note.sources.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-slate-600 dark:text-slate-300"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />
+                      {src.title && src.title !== '-' && src.title !== note.title && (
+                        <span className="font-semibold text-slate-800 dark:text-slate-100">
+                          {src.title}
+                        </span>
+                      )}
+                      {src.author && (
+                        <span>
+                          by <strong className="text-slate-700 dark:text-slate-200">{src.author}</strong>
+                          {src.published_year ? ` (${src.published_year})` : ''}
+                        </span>
+                      )}
+                      {src.url && (
+                        <a
+                          href={src.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline text-xs"
+                        >
+                          <span>Link</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Rating & Timeline */}

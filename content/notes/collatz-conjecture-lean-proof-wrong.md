@@ -3,11 +3,11 @@ id: collatz-conjecture-lean-proof-wrong
 title: Collatz Conjecture Lean Proof Turns Out to be Wrong
 topic: Mathematics
 type: article
-source:
-  title: '-'
-  author: Soham Mallick
-  url: 'https://lnkd.in/p/gHcb9imj'
-  published_year: 2026
+sources:
+  - title: Collatz Conjecture Lean Proof Discussion
+    author: Soham Mallick
+    url: 'https://lnkd.in/p/gHcb9imj'
+    published_year: 2026
 status: completed
 rating: 5
 tags:

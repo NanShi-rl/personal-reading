@@ -3,11 +3,11 @@ id: intro-to-mathematical-formalization-lean
 title: 基于 Lean 的数学形式化简介
 topic: Mathematics
 type: article
-source:
-  title: 基于 Lean 的数学形式化简介
-  author: '李晨毅, 文再文'
-  url: 'https://faculty.bicmr.pku.edu.cn/~wenzw/paper/OptLean.pdf'
-  published_year: 2024
+sources:
+  - title: 基于 Lean 的数学形式化简介
+    author: '李晨毅, 文再文'
+    url: 'https://faculty.bicmr.pku.edu.cn/~wenzw/paper/OptLean.pdf'
+    published_year: 2024
 status: completed
 rating: 4
 tags:

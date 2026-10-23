@@ -31,7 +31,11 @@ export default function DashboardClient({
         !searchQuery ||
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.source?.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.sources?.some(
+          (s) =>
+            s.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.title?.toLowerCase().includes(searchQuery.toLowerCase())
+        ) ||
         note.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
 

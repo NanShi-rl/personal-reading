@@ -51,11 +51,12 @@ export default function NoteCard({ note }: NoteCardProps) {
           </h3>
         </Link>
 
-        {/* Author / Source */}
-        {note.source?.author && (
+        {/* Author / Sources */}
+        {note.sources && note.sources.length > 0 && (
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
-            by <span className="text-slate-700 dark:text-slate-300 font-medium">{note.source.author}</span>
-            {note.source.published_year ? ` (${note.source.published_year})` : ''}
+            by <span className="text-slate-700 dark:text-slate-300 font-medium">{note.sources.map((s) => s.author).filter(Boolean).join(', ') || note.sources[0].title}</span>
+            {note.sources[0]?.published_year ? ` (${note.sources[0].published_year})` : ''}
+            {note.sources.length > 1 ? ` +${note.sources.length - 1} more` : ''}
           </p>
         )}
 

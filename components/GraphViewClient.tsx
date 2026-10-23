@@ -616,9 +616,11 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
                     {selectedNode.title}
                   </h3>
-                  {selectedNode.source?.author && (
+                  {selectedNode.sources && selectedNode.sources.length > 0 && (
                     <p className="text-xs text-slate-500 mt-1">
-                      By <strong className="text-slate-700 dark:text-slate-300">{selectedNode.source.author}</strong>
+                      By <strong className="text-slate-700 dark:text-slate-300">{selectedNode.sources.map((s) => s.author).filter(Boolean).join(', ') || selectedNode.sources[0].title}</strong>
+                      {selectedNode.sources[0]?.published_year ? ` (${selectedNode.sources[0].published_year})` : ''}
+                      {selectedNode.sources.length > 1 ? ` +${selectedNode.sources.length - 1} more` : ''}
                     </p>
                   )}
                 </div>

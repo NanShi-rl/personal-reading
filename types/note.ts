@@ -28,7 +28,8 @@ export interface ReadingNoteFrontmatter {
   title: string;
   topic: string;
   type: ReadingType;
-  source: SourceMetadata;
+  source?: SourceMetadata; // Optional legacy single source
+  sources?: SourceMetadata[]; // Multiple sources support
   status: ReadingStatus;
   rating?: number; // 1-5 scale
   tags: string[];
@@ -50,5 +51,6 @@ export interface BacklinkInfo {
 export interface ReadingNote extends ReadingNoteFrontmatter {
   slug: string;
   content: string;
+  sources: SourceMetadata[];
   backlinks?: BacklinkInfo[];
 }

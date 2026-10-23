@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { ReadingNote, ReadingNoteFrontmatter, BacklinkInfo } from '@/types/note';
+import { ReadingNote, ReadingNoteFrontmatter, BacklinkInfo, SourceMetadata } from '@/types/note';
 
 const notesDirectory = path.join(process.cwd(), 'content/notes');
 
@@ -31,11 +31,20 @@ export function getNoteBySlug(slug: string): ReadingNote | null {
 
   const frontmatter = data as ReadingNoteFrontmatter;
 
+  // Normalize sources: prefer frontmatter.sources array, fallback to frontmatter.source object
+  let sources: SourceMetadata[] = [];
+  if (Array.isArray(frontmatter.sources) && frontmatter.sources.length > 0) {
+    sources = frontmatter.sources;
+  } else if (frontmatter.source && (frontmatter.source.title || frontmatter.source.author)) {
+    sources = [frontmatter.source];
+  }
+
   return {
     ...frontmatter,
     id: frontmatter.id || slug,
     slug,
     content,
+    sources,
     tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : [],
     links: Array.isArray(frontmatter.links) ? frontmatter.links : [],
     key_takeaways: Array.isArray(frontmatter.key_takeaways) ? frontmatter.key_takeaways : [],
