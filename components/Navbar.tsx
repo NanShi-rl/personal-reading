@@ -3,93 +3,85 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Search, PlusCircle, Settings, Network, BookMarked, Sun, Moon } from 'lucide-react';
+import { PlusCircle, Settings, GitCommit } from 'lucide-react';
 import SettingsModal from '@/components/SettingsModal';
+import CommitModal from '@/components/CommitModal';
+import { getPendingChanges, onPendingChangesUpdated } from '@/lib/localStore';
 
 interface NavbarProps {
   onOpenNewNote?: () => void;
+  onOpenCommit?: () => void;
 }
 
-export default function Navbar({ onOpenNewNote }: NavbarProps) {
+export default function Navbar({ onOpenNewNote, onOpenCommit }: NavbarProps) {
   const pathname = usePathname();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+  const [isCommitModalOpen, setIsCommitModalOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isDarkMode = document.documentElement.classList.contains('dark') ||
-        (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      setIsDark(isDarkMode);
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
+    const updateCount = () => {
+      setPendingCount(getPendingChanges().length);
+    };
+    updateCount();
+    const unsubscribe = onPendingChangesUpdated(updateCount);
+    return () => unsubscribe();
   }, []);
 
-  const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      localStorage.theme = 'light';
-      setIsDark(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.theme = 'dark';
-      setIsDark(true);
-    }
-  };
-
   const navLinks = [
-    { label: 'Dashboard', href: '/', icon: BookOpen },
-    { label: 'Knowledge Graph', href: '/graph/', icon: Network },
-    { label: 'Topics', href: '/topics/', icon: BookMarked },
+    { label: 'Notes', href: '/' },
+    { label: 'Graph', href: '/graph/' },
+    { label: 'Topics', href: '/topics/' },
   ];
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-bold text-slate-900 dark:text-white tracking-tight text-base sm:text-lg">
-                Reading Garden
-              </span>
-              <span className="hidden sm:inline-block ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md">
-                PKM
-              </span>
-            </div>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-1">
+      <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-slate-950/80 border-b border-white/10">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-[60px] flex items-center justify-between gap-4">
+          <nav className="flex items-center gap-5 sm:gap-8">
             {navLinks.map((link) => {
-              const Icon = link.icon;
               const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                  className={`text-sm sm:text-base transition-opacity ${
+                    isActive ? 'opacity-100 underline underline-offset-8 decoration-2' : 'opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{link.label}</span>
+                  {link.label}
                 </Link>
               );
             })}
           </nav>
 
+          {/* Centred wordmark */}
+          <Link
+            href="/"
+            className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-extrabold uppercase text-lg text-mosby-paper tracking-tight whitespace-nowrap"
+          >
+            Reading Garden
+          </Link>
+
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => (onOpenCommit ? onOpenCommit() : setIsCommitModalOpen(true))}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                pendingCount > 0
+                  ? 'bg-mosby-yellow text-black hover:bg-white'
+                  : 'border border-white/20 text-slate-300 hover:bg-white/10'
+              }`}
+              title={pendingCount > 0 ? `${pendingCount} uncommitted local changes` : 'Commit changes to GitHub'}
+            >
+              <GitCommit className="w-4 h-4" />
+              <span className="hidden sm:inline">Commit</span>
+              {pendingCount > 0 && <span className="font-semibold">{pendingCount}</span>}
+            </button>
+
             {onOpenNewNote && (
               <button
                 onClick={onOpenNewNote}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium shadow-sm transition-all hover:shadow"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-mosby-paper text-black hover:bg-white text-xs font-medium transition-colors"
               >
                 <PlusCircle className="w-4 h-4" />
                 <span className="hidden sm:inline">New Note</span>
@@ -98,24 +90,20 @@ export default function Navbar({ onOpenNewNote }: NavbarProps) {
 
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="GitHub Token Settings"
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              title="GitHub Integration Settings"
             >
               <Settings className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Toggle Theme"
-            >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           </div>
         </div>
       </header>
 
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <CommitModal
+        isOpen={isCommitModalOpen}
+        onClose={() => setIsCommitModalOpen(false)}
+      />
     </>
   );
 }

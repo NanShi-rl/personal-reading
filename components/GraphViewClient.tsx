@@ -22,6 +22,8 @@ import {
 import Navbar from '@/components/Navbar';
 import NoteEditorModal from '@/components/NoteEditorModal';
 import { ReadingNote } from '@/types/note';
+import { getMergedNotes, onPendingChangesUpdated } from '@/lib/localStore';
+import { buildTopicColorMap } from '@/lib/topicColor';
 
 interface GraphViewClientProps {
   notes: ReadingNote[];
@@ -52,20 +54,19 @@ interface GraphLink {
   notes?: string;
 }
 
-const TOPIC_COLORS = [
-  '#0284c7', // Sky blue
-  '#6366f1', // Indigo
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#ec4899', // Pink
-  '#8b5cf6', // Purple
-  '#14b8a6', // Teal
-  '#f97316', // Orange
-];
-
-export default function GraphViewClient({ notes }: GraphViewClientProps) {
+export default function GraphViewClient({ notes: initialNotes }: GraphViewClientProps) {
+  const [notes, setNotes] = useState<ReadingNote[]>(initialNotes);
   const [selectedTopic, setSelectedTopic] = useState<string>('All');
   const [selectedNode, setSelectedNode] = useState<ReadingNote | null>(null);
+
+  useEffect(() => {
+    const updateLocalState = () => {
+      setNotes(getMergedNotes(initialNotes));
+    };
+    updateLocalState();
+    const unsubscribe = onPendingChangesUpdated(updateLocalState);
+    return () => unsubscribe();
+  }, [initialNotes]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -83,13 +84,15 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
     return Array.from(new Set(notes.map((n) => n.topic || 'General')));
   }, [notes]);
 
+  // Same topic -> colour mapping as the folders on the other pages
+  const topicPalette = useMemo(() => buildTopicColorMap(allTopics), [allTopics]);
   const topicColorMap = useMemo(() => {
     const map: Record<string, string> = {};
-    allTopics.forEach((topic, idx) => {
-      map[topic] = TOPIC_COLORS[idx % TOPIC_COLORS.length];
+    allTopics.forEach((topic) => {
+      map[topic] = topicPalette[topic].bg;
     });
     return map;
-  }, [allTopics]);
+  }, [allTopics, topicPalette]);
 
   // Filtered notes based on category cluster filter
   const visibleNotes = useMemo(() => {
@@ -148,7 +151,7 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
           status: note.status,
           summary: note.summary,
           tags: note.tags || [],
-          color: topicColorMap[note.topic] || '#0284c7',
+          color: topicColorMap[note.topic] || '#1e4bd7',
         };
       }
 
@@ -170,7 +173,7 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
         vx: 0,
         vy: 0,
         radius: 24,
-        color: topicColorMap[note.topic] || '#0284c7',
+        color: topicColorMap[note.topic] || '#1e4bd7',
       };
     });
 
@@ -319,7 +322,7 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
-        ctx.strokeStyle = isHighlighted ? '#3b82f6' : '#94a3b8';
+        ctx.strokeStyle = isHighlighted ? '#ffffff' : '#5a5955';
         ctx.lineWidth = isHighlighted ? 2.5 : 1.2;
         ctx.stroke();
 
@@ -338,14 +341,14 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
           arrowX - Math.cos(angle + Math.PI / 6) * 8,
           arrowY - Math.sin(angle + Math.PI / 6) * 8
         );
-        ctx.fillStyle = isHighlighted ? '#3b82f6' : '#94a3b8';
+        ctx.fillStyle = isHighlighted ? '#ffffff' : '#5a5955';
         ctx.fill();
 
         // Relationship badge text
         if (link.relationship) {
           const midX = (source.x + target.x) / 2;
           const midY = (source.y + target.y) / 2;
-          ctx.fillStyle = isHighlighted ? '#1e293b' : '#64748b';
+          ctx.fillStyle = isHighlighted ? '#ffffff' : '#8f8d88';
           ctx.font = '9px system-ui, -apple-system, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(link.relationship.replace(/_/g, ' '), midX, midY - 4);
@@ -373,12 +376,12 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
         ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
         ctx.fillStyle = node.color;
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#191919';
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
         // Node inner icon / initial
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = topicPalette[node.topic]?.ink || '#ffffff';
         ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -386,7 +389,7 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
 
         // Node Title label under the circle
         ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-        ctx.fillStyle = isSelected ? '#0284c7' : '#1e293b';
+        ctx.fillStyle = isSelected ? '#ffffff' : '#b4b2ac';
         ctx.textBaseline = 'top';
 
         // Truncate label if too long
@@ -410,7 +413,7 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
         cancelAnimationFrame(simulationRef.current);
       }
     };
-  }, [allTopics, links, topicColorMap, hoveredNodeId, selectedNode, zoom, pan]);
+  }, [allTopics, links, topicColorMap, topicPalette, hoveredNodeId, selectedNode, zoom, pan]);
 
   // Helper to map mouse coordinates to virtual canvas coordinates
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -477,76 +480,50 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-slate-950">
       <Navbar onOpenNewNote={() => setIsEditorOpen(true)} />
 
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 flex-1 space-y-6">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-brand-600 dark:text-brand-400 font-bold text-xs uppercase tracking-wider">
-              <Network className="w-4 h-4" />
-              <span>Zettelkasten Knowledge Graph</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
-              Visual Knowledge Graph
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Interactive network of personal readings. Click any node to inspect note details and connected linkages.
-            </p>
-          </div>
+      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-12 flex-1 space-y-8">
+        {/* Header */}
+        <section className="text-center max-w-3xl mx-auto">
+          <h1 className="display-title text-5xl sm:text-7xl">Graph</h1>
+          <p className="mt-5 text-sm sm:text-base text-slate-400 leading-relaxed">
+            How your readings connect. Colours match the folders; click a node to inspect it, drag to rearrange.
+          </p>
+        </section>
 
-          <button
-            onClick={() => setIsEditorOpen(true)}
-            className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Reading Note</span>
-          </button>
-        </div>
-
-        {/* Cluster Filter Buttons */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Categories:
-          </span>
+        {/* Topic filter: folder-coloured tabs */}
+        <div className="flex items-end gap-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setSelectedTopic('All')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors ${
-              selectedTopic === 'All'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+            className={`folder-tab shrink-0 h-10 text-sm font-semibold whitespace-nowrap transition-opacity ${
+              selectedTopic === 'All' ? 'bg-white text-black' : 'bg-white/20 text-white opacity-70 hover:opacity-100'
             }`}
           >
-            All Clusters ({notes.length})
+            All ({notes.length})
           </button>
           {allTopics.map((topic) => {
             const count = notes.filter((n) => n.topic === topic).length;
             const isSelected = selectedTopic === topic;
+            const c = topicPalette[topic];
             return (
               <button
                 key={topic}
                 onClick={() => setSelectedTopic(topic)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors ${
-                  isSelected
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
+                className={`folder-tab shrink-0 h-10 text-sm font-semibold whitespace-nowrap transition-opacity ${
+                  isSelected ? 'opacity-100' : 'opacity-50 hover:opacity-100'
                 }`}
+                style={{ background: c.bg, color: c.ink }}
               >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: topicColorMap[topic] || '#0284c7' }}
-                />
-                <span>{topic} ({count})</span>
+                {topic} ({count})
               </button>
             );
           })}
         </div>
 
-        {/* Visual Graph + Side Inspector Panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* Main Interactive Canvas */}
-          <div className="lg:col-span-2 relative rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden h-[540px]">
+        {/* Canvas + inspector */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start -mt-6">
+          <div className="lg:col-span-2 relative rounded-lg bg-slate-900 border border-white/10 overflow-hidden h-[540px]">
             <canvas
               ref={canvasRef}
               width={800}
@@ -557,18 +534,17 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
               className="w-full h-full cursor-grab active:cursor-grabbing block"
             />
 
-            {/* Canvas Zoom / Pan Controls Overlay */}
-            <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md">
+            <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-slate-950/90 backdrop-blur-md p-1.5 rounded-lg border border-white/10">
               <button
                 onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))}
-                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="p-1.5 rounded-lg text-slate-300 hover:bg-white/10"
                 title="Zoom In"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}
-                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="p-1.5 rounded-lg text-slate-300 hover:bg-white/10"
                 title="Zoom Out"
               >
                 <ZoomOut className="w-4 h-4" />
@@ -578,67 +554,60 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
                   setZoom(1);
                   setPan({ x: 0, y: 0 });
                 }}
-                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="p-1.5 rounded-lg text-slate-300 hover:bg-white/10"
                 title="Reset View"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Helper Hint */}
             <div className="absolute top-4 left-4 pointer-events-none">
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-900/60 dark:bg-slate-800/80 backdrop-blur-md text-white border border-white/10">
-                Drag nodes to reposition · Click node to inspect
+              <span className="px-2.5 py-1 rounded text-[11px] bg-slate-950/80 text-slate-300 border border-white/10">
+                Drag nodes · Click to inspect
               </span>
             </div>
           </div>
 
-          {/* Node Inspector Drawer */}
-          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-6 min-h-[540px] flex flex-col justify-between">
+          {/* Node inspector: a coloured folder panel when a node is selected */}
+          <div
+            className="rounded-lg border border-white/10 min-h-[540px] flex flex-col overflow-hidden"
+            style={
+              selectedNode
+                ? {
+                    background: topicColorMap[selectedNode.topic] || '#1e4bd7',
+                    color: topicPalette[selectedNode.topic]?.ink || '#ffffff',
+                    borderColor: 'transparent',
+                  }
+                : undefined
+            }
+          >
             {selectedNode ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <span
-                    className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full text-white"
-                    style={{ backgroundColor: topicColorMap[selectedNode.topic] || '#0284c7' }}
-                  >
-                    {selectedNode.topic}
-                  </span>
-                  <button
-                    onClick={() => setSelectedNode(null)}
-                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
+              <div className="p-6 space-y-4 flex-1 flex flex-col">
+                <div className="flex items-center justify-between text-xs uppercase tracking-wider">
+                  <span className="font-semibold">{selectedNode.topic}</span>
+                  <button onClick={() => setSelectedNode(null)} className="opacity-80 hover:opacity-100" title="Close">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">
-                    {selectedNode.title}
-                  </h3>
+                  <h3 className="text-xl font-extrabold leading-snug">{selectedNode.title}</h3>
                   {selectedNode.sources && selectedNode.sources.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      By <strong className="text-slate-700 dark:text-slate-300">{selectedNode.sources.map((s) => s.author).filter(Boolean).join(', ') || selectedNode.sources[0].title}</strong>
+                    <p className="text-xs mt-1 opacity-90">
+                      {selectedNode.sources.map((s) => s.author).filter(Boolean).join(', ') || selectedNode.sources[0].title}
                       {selectedNode.sources[0]?.published_year ? ` (${selectedNode.sources[0].published_year})` : ''}
                       {selectedNode.sources.length > 1 ? ` +${selectedNode.sources.length - 1} more` : ''}
                     </p>
                   )}
                 </div>
 
-                {selectedNode.summary && (
-                  <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800 italic leading-relaxed">
-                    &ldquo;{selectedNode.summary}&rdquo;
-                  </p>
-                )}
+                {selectedNode.summary && <p className="text-xs leading-relaxed opacity-95">{selectedNode.summary}</p>}
 
-                {/* Connected Readings List */}
                 <div className="space-y-2 pt-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Connected Readings:
-                  </h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider opacity-80">Connected readings</h4>
                   {(!selectedNode.links || selectedNode.links.length === 0) &&
                   (!selectedNode.backlinks || selectedNode.backlinks.length === 0) ? (
-                    <p className="text-xs text-slate-400 italic">No connected links for this note.</p>
+                    <p className="text-xs opacity-80">No connected links for this note.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-44 overflow-y-auto">
                       {selectedNode.links?.map((link, idx) => {
@@ -646,13 +615,11 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
                         return (
                           <div
                             key={idx}
-                            className="p-2 rounded-lg bg-brand-50/60 dark:bg-brand-950/20 border border-brand-100 dark:border-brand-900/40 text-xs flex items-center justify-between"
+                            className="p-2 rounded bg-slate-950 text-white text-xs flex items-center justify-between gap-2"
                           >
-                            <span className="font-semibold text-brand-700 dark:text-brand-300 truncate max-w-[140px]">
-                              {target?.title || link.id}
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-900 text-brand-800 dark:text-brand-200">
-                              {link.relationship}
+                            <span className="font-semibold truncate">{target?.title || link.id}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 shrink-0">
+                              → {link.relationship.replace(/_/g, ' ')}
                             </span>
                           </div>
                         );
@@ -661,13 +628,11 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
                       {selectedNode.backlinks?.map((backlink, idx) => (
                         <div
                           key={idx}
-                          className="p-2 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-xs flex items-center justify-between"
+                          className="p-2 rounded bg-slate-950 text-white text-xs flex items-center justify-between gap-2"
                         >
-                          <span className="font-semibold text-indigo-700 dark:text-indigo-300 truncate max-w-[140px]">
-                            {backlink.sourceNoteTitle}
-                          </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
-                            {backlink.relationship}
+                          <span className="font-semibold truncate">{backlink.sourceNoteTitle}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400 shrink-0">
+                            ← {backlink.relationship.replace(/_/g, ' ')}
                           </span>
                         </div>
                       ))}
@@ -675,24 +640,22 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
                   )}
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <div className="mt-auto pt-4">
                   <Link
                     href={`/notes/${selectedNode.slug}/`}
-                    className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-sm transition-all"
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-slate-950 text-white hover:bg-black font-semibold text-xs transition-colors"
                   >
-                    <span>Read Full Note & Insights</span>
+                    <span>Read full note</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-16 space-y-3 my-auto">
-                <Network className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                  Select a Reading Node
-                </h3>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Click on any node in the knowledge graph to view its summary, takeaways, and link relationships.
+              <div className="text-center py-16 space-y-3 my-auto px-6">
+                <Network className="w-8 h-8 text-slate-500 mx-auto" />
+                <h3 className="text-sm font-semibold text-slate-200">Select a reading node</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                  Click any node to see its summary and link relationships.
                 </p>
               </div>
             )}
@@ -700,8 +663,8 @@ export default function GraphViewClient({ notes }: GraphViewClientProps) {
         </div>
       </main>
 
-      <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400">
-        <p>Personal Reading Notes & Knowledge Graph · Built with Next.js, GitHub Pages & GitHub Actions</p>
+      <footer className="border-t border-white/10 py-6 text-center text-xs text-slate-500">
+        <p>Personal Reading Notes &amp; Knowledge Graph · Built with Next.js, GitHub Pages &amp; GitHub Actions</p>
       </footer>
 
       <NoteEditorModal

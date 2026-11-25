@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import matter from 'gray-matter';
 import { ReadingNote, ReadingType, ReadingStatus, LinkRelationship, NoteLinkage, SourceMetadata } from '@/types/note';
-import { commitFileToGitHub, deleteFileFromGitHub, getStoredGitHubToken } from '@/lib/github';
+import { savePendingChange } from '@/lib/localStore';
 
 interface NoteEditorModalProps {
   isOpen: boolean;
@@ -183,13 +183,7 @@ export default function NoteEditorModal({
     return matter.stringify(markdownContent, frontmatterObj);
   };
 
-  const handleSaveToGitHub = async () => {
-    const token = getStoredGitHubToken();
-    if (!token) {
-      setErrorMessage('Please set your GitHub Personal Access Token in the top-right Settings modal first.');
-      return;
-    }
-
+  const handleSaveLocally = () => {
     if (!id.trim() || !title.trim() || !topic.trim()) {
       setErrorMessage('Note ID, Title, and Main Topic are required fields.');
       return;
@@ -201,21 +195,68 @@ export default function NoteEditorModal({
 
     const fullMarkdown = generateFullMarkdown();
     const filePath = `content/notes/${id.trim()}.md`;
-    const commitMsg = isEditing ? `docs(notes): update reading note for "${title}"` : `docs(notes): add reading note for "${title}"`;
 
-    const result = await commitFileToGitHub(filePath, fullMarkdown, commitMsg);
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const keyTakeaways = keyTakeawaysInput
+      .split('\n')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const cleanedSources = sources
+      .map((s) => ({
+        title: s.title?.trim() || title.trim(),
+        author: s.author?.trim() || '',
+        ...(s.url?.trim() ? { url: s.url.trim() } : {}),
+        ...(s.published_year ? { published_year: Number(s.published_year) } : {}),
+      }))
+      .filter((s) => s.author || s.title || s.url);
+
+    const noteObj: ReadingNote = {
+      id: id.trim(),
+      slug: id.trim(),
+      title: title.trim(),
+      topic: topic.trim(),
+      type,
+      sources: cleanedSources.length > 0 ? cleanedSources : [{ title: title.trim(), author: '' }],
+      status,
+      rating: Number(rating),
+      tags,
+      links: links || [],
+      date_started: dateStarted || undefined,
+      date_finished: dateFinished || undefined,
+      last_modified: new Date().toISOString().split('T')[0],
+      summary: summary.trim(),
+      key_takeaways: keyTakeaways,
+      content: markdownContent,
+      backlinks: note?.backlinks || [],
+    };
+
+    savePendingChange({
+      type: isEditing ? 'update' : 'create',
+      noteId: id.trim(),
+      slug: id.trim(),
+      title: title.trim(),
+      filePath,
+      markdown: fullMarkdown,
+      note: noteObj,
+      timestamp: Date.now(),
+    });
 
     setIsSubmitting(false);
-    if (result.success) {
-      setSuccessMessage('Note committed successfully to GitHub repository! GitHub Actions will trigger a deployment.');
-      if (onSuccess) {
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 1500);
-      }
+    setSuccessMessage('Changes saved locally! Trigger a commit on the front page when you are ready to deploy.');
+    if (onSuccess) {
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 700);
     } else {
-      setErrorMessage(result.error || 'Failed to save note to repository.');
+      setTimeout(() => {
+        onClose();
+      }, 700);
     }
   };
 
@@ -235,7 +276,7 @@ export default function NoteEditorModal({
                 {isEditing ? `Edit: ${note?.title}` : 'Create New Reading Note'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Directly commits Markdown & structured metadata to GitHub
+                Saves locally to your browser. Push & deploy anytime from the front page.
               </p>
             </div>
           </div>
@@ -681,7 +722,7 @@ export default function NoteEditorModal({
         {/* Footer Actions */}
         <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
           <p className="text-xs text-slate-500">
-            Saved changes trigger automatic GitHub Pages deployment via GitHub Actions.
+            Saves locally in browser storage. Commit to GitHub from the front page to build & publish.
           </p>
 
           <div className="flex items-center gap-3">
@@ -694,7 +735,7 @@ export default function NoteEditorModal({
             </button>
             <button
               type="button"
-              onClick={handleSaveToGitHub}
+              onClick={handleSaveLocally}
               disabled={isSubmitting}
               className="flex items-center gap-2 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-brand-500/20 transition-all"
             >
@@ -703,7 +744,7 @@ export default function NoteEditorModal({
               ) : (
                 <Save className="w-4 h-4" />
               )}
-              <span>{isSubmitting ? 'Committing...' : 'Commit to GitHub'}</span>
+              <span>{isSubmitting ? 'Saving...' : 'Save Locally'}</span>
             </button>
           </div>
         </div>

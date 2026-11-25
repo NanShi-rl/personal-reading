@@ -1,5 +1,6 @@
 import matter from 'gray-matter';
 import { ReadingNote } from '@/types/note';
+import { PendingChange } from '@/lib/localStore';
 
 export interface GitHubCommitResult {
   success: boolean;
@@ -285,5 +286,89 @@ export async function deleteNoteWithCascadeCleanup(
   return {
     success: true,
     message: `Note "${noteId}" and all linkages to it were successfully removed.`,
+  };
+}
+
+export interface BatchCommitResult {
+  success: boolean;
+  totalProcessed: number;
+  errors: string[];
+  lastCommitSha?: string;
+  message?: string;
+}
+
+export async function commitAllPendingChanges(
+  changes: PendingChange[],
+  customCommitMsg?: string,
+  onProgress?: (completed: number, total: number, currentItem: string) => void
+): Promise<BatchCommitResult> {
+  const token = getStoredGitHubToken();
+  if (!token) {
+    return {
+      success: false,
+      totalProcessed: 0,
+      errors: ['GitHub Personal Access Token is not configured. Please set your PAT in Settings first.'],
+    };
+  }
+
+  if (changes.length === 0) {
+    return {
+      success: true,
+      totalProcessed: 0,
+      errors: [],
+      message: 'No pending changes to commit.',
+    };
+  }
+
+  const errors: string[] = [];
+  let processed = 0;
+  let lastSha: string | undefined;
+
+  for (let i = 0; i < changes.length; i++) {
+    const item = changes[i];
+    if (onProgress) {
+      onProgress(i, changes.length, `${item.type.toUpperCase()}: ${item.title}`);
+    }
+
+    const defaultMsg =
+      item.type === 'delete'
+        ? `docs(notes): delete note "${item.title}"`
+        : item.type === 'create'
+        ? `docs(notes): add reading note for "${item.title}"`
+        : `docs(notes): update reading note for "${item.title}"`;
+
+    const commitMsg = customCommitMsg && changes.length === 1 ? customCommitMsg : defaultMsg;
+
+    if (item.type === 'delete') {
+      const res = await deleteFileFromGitHub(item.filePath, undefined, commitMsg);
+      if (res.success) {
+        processed++;
+      } else {
+        errors.push(`Failed to delete "${item.title}": ${res.error}`);
+      }
+    } else if (item.markdown) {
+      const res = await commitFileToGitHub(item.filePath, item.markdown, commitMsg);
+      if (res.success) {
+        processed++;
+        lastSha = res.commitSha;
+      } else {
+        errors.push(`Failed to save "${item.title}": ${res.error}`);
+      }
+    }
+  }
+
+  if (onProgress) {
+    onProgress(changes.length, changes.length, 'Completed');
+  }
+
+  return {
+    success: errors.length === 0,
+    totalProcessed: processed,
+    errors,
+    lastCommitSha: lastSha,
+    message:
+      errors.length === 0
+        ? `Successfully committed ${processed} file(s) to GitHub! Build triggered.`
+        : `Committed ${processed} of ${changes.length} file(s) with errors.`,
   };
 }
