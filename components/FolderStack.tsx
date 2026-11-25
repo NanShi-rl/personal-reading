@@ -2,10 +2,12 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import NoteCard from '@/components/NoteCard';
 import { ReadingNote } from '@/types/note';
 import { TopicColor } from '@/lib/topicColor';
+import { openWithFolderTransition } from '@/lib/folderTransition';
 
 interface FolderStackProps {
   notes: ReadingNote[];
@@ -29,6 +31,22 @@ export default function FolderStack({
   onEdit,
   openAll = false,
 }: FolderStackProps) {
+  const router = useRouter();
+
+  // Open readings through the folder transition (colour grows from the clicked tab/card)
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const anchor = (e.target as HTMLElement).closest('a[data-folder-href]') as HTMLAnchorElement | null;
+    if (!anchor) return;
+    e.preventDefault();
+    openWithFolderTransition(
+      router,
+      anchor.dataset.folderHref as string,
+      anchor.dataset.folderColor || '#1e4bd7',
+      anchor.getBoundingClientRect()
+    );
+  };
+
   // undefined = never toggled -> first folder open by default; null = all closed
   const [openTopic, setOpenTopic] = useState<string | null | undefined>(undefined);
 
@@ -46,7 +64,7 @@ export default function FolderStack({
   const effectiveOpen = openTopic === undefined ? groups[0]?.topic : openTopic;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" onClickCapture={handleClickCapture}>
       {groups.map(({ topic, items }, i) => {
         const color = colorMap[topic] || { bg: '#1e4bd7', ink: '#ffffff' };
         const prevBg = i > 0 ? (colorMap[groups[i - 1].topic]?.bg ?? 'transparent') : 'transparent';
@@ -79,6 +97,8 @@ export default function FolderStack({
                   <Link
                     key={note.id}
                     href={`/notes/${note.slug}/`}
+                    data-folder-href={`/notes/${note.slug}/`}
+                    data-folder-color={color.bg}
                     className={tabClass}
                     style={tabStyle}
                     title={note.title}

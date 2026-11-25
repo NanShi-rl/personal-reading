@@ -61,7 +61,12 @@ export default function NoteCard({ note, accent, isPending, isNewDraft, onEdit }
               {title}
             </button>
           ) : (
-            <Link href={`/notes/${note.slug}/`} className="block">
+            <Link
+              href={`/notes/${note.slug}/`}
+              data-folder-href={`/notes/${note.slug}/`}
+              data-folder-color={accent}
+              className="block"
+            >
               {title}
             </Link>
           )}
@@ -120,6 +125,8 @@ export default function NoteCard({ note, accent, isPending, isNewDraft, onEdit }
           ) : (
             <Link
               href={`/notes/${note.slug}/`}
+              data-folder-href={`/notes/${note.slug}/`}
+              data-folder-color={accent}
               className="inline-flex items-center gap-1 font-semibold text-white group-hover:translate-x-0.5 transition-transform"
             >
               Read <ArrowRight className="w-3.5 h-3.5" />

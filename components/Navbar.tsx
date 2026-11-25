@@ -11,9 +11,11 @@ import { getPendingChanges, onPendingChangesUpdated } from '@/lib/localStore';
 interface NavbarProps {
   onOpenNewNote?: () => void;
   onOpenCommit?: () => void;
+  /** When set, replaces the centred wordmark (e.g. the open note's title once scrolled). */
+  contextTitle?: string;
 }
 
-export default function Navbar({ onOpenNewNote, onOpenCommit }: NavbarProps) {
+export default function Navbar({ onOpenNewNote, onOpenCommit, contextTitle }: NavbarProps) {
   const pathname = usePathname();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommitModalOpen, setIsCommitModalOpen] = useState(false);
@@ -58,9 +60,10 @@ export default function Navbar({ onOpenNewNote, onOpenCommit }: NavbarProps) {
           {/* Centred wordmark */}
           <Link
             href="/"
-            className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-extrabold uppercase text-lg text-mosby-paper tracking-tight whitespace-nowrap"
+            className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-extrabold uppercase text-lg text-mosby-paper tracking-tight whitespace-nowrap max-w-[30%] truncate"
+            title={contextTitle}
           >
-            Reading Garden
+            {contextTitle || 'Reading Garden'}
           </Link>
 
           <div className="flex items-center gap-2">

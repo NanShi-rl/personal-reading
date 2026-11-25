@@ -26,5 +26,6 @@ export default async function NotePage({ params }: NotePageProps) {
   const allNotes = getAllNotes();
   const currentNoteWithBacklinks = allNotes.find((n) => n.slug === slug) || note;
 
-  return <NoteDetailClient note={currentNoteWithBacklinks} allNotes={allNotes} />;
+  // key remounts the client component per note so the "folder opens" animation replays
+  return <NoteDetailClient key={slug} note={currentNoteWithBacklinks} allNotes={allNotes} />;
 }
